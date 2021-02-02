@@ -6,6 +6,7 @@ import numpy as np
 import cv2
 from tqdm import tqdm
 import os
+import h5py
 
 def get_filenames(files_path):
     return [os.path.basename(x) for x in glob.glob(files_path)]
@@ -50,8 +51,7 @@ def crop_and_save(images_path, masks_path, result_images_path, result_masks_path
 
     for image_filename in tqdm(image_files, total = len(image_files)):
        
-        image_path = images_path + image_filename
-        image = cv2.imread(image_path)
+        image = cv2.imread(images_path + image_filename)
         
         mask_path = masks_path + image_filename[:-1]
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
@@ -97,6 +97,11 @@ def crop(image, mask, r1, r2, c1, c2):
 
     return(result_image, result_mask)
 
+def save_to_h5py(img_data, name, save_path):
+    f = h5py.File(save_path,'w')
+    dset = f.create_dataset(name, data=img_data, compression="gzip", compression_opts=4)
+    f.close()
+
 if __name__ == "__main__":
     config = configparser.ConfigParser()
     config.read('config.ini')
@@ -117,5 +122,11 @@ if __name__ == "__main__":
     if not os.path.exists(result_masks_path):
         os.mkdir(result_masks_path)
 
-    crop_and_save(images_path, masks_path, result_images_path, result_masks_path, img_size)
-    split_to_test_and_train(root, result_images_path, result_masks_path, test_files_percent)
+    img_np = np.array([cv2.imread(path) for path in glob.glob(result_images_path+'*.tiff')])
+    save_to_h5py(img_np, 'all_images', 'images.hdf5')
+
+    mas_np = np.array([cv2.imread(path, cv2.IMREAD_GRAYSCALE) for path in glob.glob(result_masks_path+'*.tiff')])
+    save_to_h5py(mas_np, 'all_masks', 'masks.hdf5')
+
+    #crop_and_save(images_path, masks_path, result_images_path, result_masks_path, img_size)
+    #split_to_test_and_train(root, result_images_path, result_masks_path, test_files_percent)
