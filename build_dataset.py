@@ -8,36 +8,35 @@ from tqdm import tqdm
 import os
 import h5py
 
+config = configparser.ConfigParser()
+config.read('config.ini')
+builder_config = config['BUILDER']
+
 def get_filenames(files_path):
     return [os.path.basename(x) for x in glob.glob(files_path)]
 
-def split_to_test_and_train(root_path, images_path, masks_path, test_split=0.3):
-    image_filenames = get_filenames(images_path +"*.tiff")
-    test_set_size = int(test_split * len(image_filenames))
-    
-    train_dir = root_path + "Train/"
-    test_dir = root_path + "Test/"
+def train_test_split(images_path, masks_path, train_path, test_path, test_split=0.3):
+    img_filenames = get_filenames(images_path +"*.tiff")
+    tests_num = int(test_split * len(img_filenames))
 
-    train_image_dir = train_dir+"Images/"
-    train_mask_dir = train_dir+"Masks/"
-    test_image_dir = test_dir+"Images/"
-    test_mask_dir = test_dir+"Masks/"
+    train_image_dir = train_path + "Images/"
+    train_mask_dir = train_path + "Masks/"
+    test_image_dir = test_path + "Images/"
+    test_mask_dir = test_path +"Masks/"
     
-    for i in range(test_set_size):
-        filename = image_filenames[i]
+    for filename in tqdm(img_filenames[:tests_num], total = tests_num):
         os.renames(images_path + filename, test_image_dir + filename)
         os.renames(masks_path + filename, test_mask_dir + filename)
     
-    for i in range(test_set_size, len(image_filenames)):
-        filename = image_filenames[i]
+    for filename in tqdm(img_filenames[tests_num:], total=len(img_filenames) - tests_num):
         os.renames(images_path + filename, train_image_dir + filename)
         os.renames(masks_path + filename, train_mask_dir + filename)
-            
-    print("Train-Test-Split COMPLETED.\nNUMBER OF IMAGES IN TRAIN SET:{}\nNUMBER OF IMAGES IN TEST SET: {}".format(len(image_filenames)-test_set_size, test_set_size))
-    print("\nTrain Directory:", train_dir)
-    print("Test Directory:", test_dir)
 
-def crop_and_save(images_path, masks_path, result_images_path, result_masks_path, img_size):
+    print("Train and test split completed")
+    print("Number of TRAIN images:", len(img_filenames) - tests_num)
+    print("Number of TEST images:", tests_num))
+
+def crop_save(images_path, masks_path, result_images_path, result_masks_path, img_size):
     print("Dataset Build Started!")
     
     skipped_num = 0
@@ -103,10 +102,6 @@ def save_to_h5py(img_data, name, save_path):
     f.close()
 
 if __name__ == "__main__":
-    config = configparser.ConfigParser()
-    config.read('config.ini')
-    builder_config = config['BUILDER']
-
     root = builder_config['root']
     test_files_percent = float(builder_config['test_files_percent'])
     img_size = int(builder_config['img_size'])
@@ -116,17 +111,45 @@ if __name__ == "__main__":
     result_images_path = root + builder_config['result_images_subfolder']
     result_masks_path = root + builder_config['result_masks_subfolder']
 
+    train_path = root + "Train/"
+    test_path = root + "Test/"
+
     if not os.path.exists(result_images_path):
         os.mkdir(result_images_path)
     
     if not os.path.exists(result_masks_path):
         os.mkdir(result_masks_path)
 
-    img_np = np.array([cv2.imread(path) for path in glob.glob(result_images_path+'*.tiff')])
-    save_to_h5py(img_np, 'all_images', 'images.hdf5')
+    # crop_save(images_path, masks_path, result_images_path, result_masks_path, img_size)
+    # train_test_split(result_images_path, result_masks_path, train_path, test_path, test_files_percent)
 
-    mas_np = np.array([cv2.imread(path, cv2.IMREAD_GRAYSCALE) for path in glob.glob(result_masks_path+'*.tiff')])
-    save_to_h5py(mas_np, 'all_masks', 'masks.hdf5')
+    print("\nTrain Directory:", train_path)
+    print("Test Directory:\n", test_path)
 
-    #crop_and_save(images_path, masks_path, result_images_path, result_masks_path, img_size)
-    #split_to_test_and_train(root, result_images_path, result_masks_path, test_files_percent)
+    print("Collecting train images...")
+    img_np = np.array([cv2.imread(path) for path in glob.glob(train_path + builder_config['result_images_subfolder'] + '*.tiff')])
+    print("Saving train images to h5py...\n")
+    save_to_h5py(img_np, 'train_images', 'train_images.hdf5')
+
+    del img_np
+
+    print("Collecting train masks...")
+    mas_np = np.array([cv2.imread(path, cv2.IMREAD_GRAYSCALE) for path in glob.glob(train_path + builder_config['result_masks_subfolder'] + '*.tiff')])
+    print("Saving train masks to h5py...\n")
+    save_to_h5py(mas_np, 'train_masks', 'train_masks.hdf5')
+
+    del mas_np
+
+    print("Collecting test images...")
+    img_np = np.array([cv2.imread(path) for path in glob.glob(test_path + builder_config['result_images_subfolder'] + '*.tiff')])
+    print("Saving test images to h5py...\n")
+    save_to_h5py(img_np, 'test_images', 'test_images.hdf5')
+
+    del img_np
+
+    print("Collecting test masks...")
+    mas_np = np.array([cv2.imread(path, cv2.IMREAD_GRAYSCALE) for path in glob.glob(test_path + builder_config['result_masks_subfolder'] + '*.tiff')])
+    print("Saving test masks to h5py...\n")
+    save_to_h5py(mas_np, 'test_masks', 'test_masks.hdf5')
+
+    del mas_np
