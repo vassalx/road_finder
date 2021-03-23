@@ -34,7 +34,7 @@ def train_test_split(images_path, masks_path, train_path, test_path, test_split=
 
     print("Train and test split completed")
     print("Number of TRAIN images:", len(img_filenames) - tests_num)
-    print("Number of TEST images:", tests_num))
+    print("Number of TEST images:", tests_num)
 
 def crop_save(images_path, masks_path, result_images_path, result_masks_path, img_size):
     print("Dataset Build Started!")
@@ -62,25 +62,23 @@ def crop_save(images_path, masks_path, result_images_path, result_masks_path, im
                 counter += 1
                 
                 cropped_image, cropped_mask = crop(image, mask, r, r + img_size, c, c + img_size)
-                
                 cropped_mask[cropped_mask>1] = 255
                 
-                if np.any(cropped_mask):
-                    black_mask_num, white_mask_num = np.unique(cropped_mask, return_counts=True)[1]
+                black_mask_num, white_mask_num = np.unique(cropped_mask, return_counts=True)[1]
                     
-                    if white_mask_num/black_mask_num < 0.01:
-                        skipped_num += 1
-                        continue
+                if white_mask_num/black_mask_num < 0.01:
+                    skipped_num += 1
+                    continue
 
-                    white_image_num = np.sum(cropped_image == 255)
+                black_image_num = np.sum(cropped_image == 0)
 
-                    if white_image_num/cropped_image.size > 0.1:
-                        skipped_num += 1
-                        continue
+                if black_image_num/cropped_image.size > 0.1:
+                    skipped_num += 1
+                    continue
 
-                    cv2.imwrite(result_images_path + str(counter) + '_' + image_filename, cropped_image)
-                    cv2.imwrite(result_masks_path + str(counter) + '_' + image_filename, cropped_mask)
-
+                cv2.imwrite(result_images_path + str(counter) + '_' + image_filename, cropped_image)
+                cv2.imwrite(result_masks_path + str(counter) + '_' + image_filename, cropped_mask)
+                
     print("complete: {} seconds.\images in {}\masks in{}".format(round((time.time()-start_time), 2), result_images_path, result_masks_path))
     print("\nNumber of skipped images: {}".format(skipped_num))
 
@@ -96,10 +94,10 @@ def crop(image, mask, r1, r2, c1, c2):
 
     return(result_image, result_mask)
 
-def save_to_h5py(img_data, name, save_path):
-    f = h5py.File(save_path,'w')
-    dset = f.create_dataset(name, data=img_data, compression="gzip", compression_opts=4)
-    f.close()
+def save_to_h5py(img_data, mask_data, save_path):
+    with h5py.File(save_path, 'w') as f:
+        f.create_dataset('images', data=img_data, compression="gzip", compression_opts=4)
+        f.create_dataset('masks', data=mask_data, compression="gzip", compression_opts=4)
 
 if __name__ == "__main__":
     root = builder_config['root']
@@ -124,32 +122,34 @@ if __name__ == "__main__":
     # train_test_split(result_images_path, result_masks_path, train_path, test_path, test_files_percent)
 
     print("\nTrain Directory:", train_path)
-    print("Test Directory:\n", test_path)
+    print("Test Directory:", test_path)
+
+    save_num = int(builder_config['save_num'])
+    test_num = int(test_files_percent * save_num)
+    train_num = save_num - test_num
 
     print("Collecting train images...")
-    img_np = np.array([cv2.imread(path) for path in glob.glob(train_path + builder_config['result_images_subfolder'] + '*.tiff')])
-    print("Saving train images to h5py...\n")
-    save_to_h5py(img_np, 'train_images', 'train_images.hdf5')
-
-    del img_np
+    img_np = np.array([cv2.imread(path) for path in glob.glob(train_path + builder_config['result_images_subfolder'] + '*.tiff')[:train_num]])
+    print(img_np.shape)
 
     print("Collecting train masks...")
-    mas_np = np.array([cv2.imread(path, cv2.IMREAD_GRAYSCALE) for path in glob.glob(train_path + builder_config['result_masks_subfolder'] + '*.tiff')])
-    print("Saving train masks to h5py...\n")
-    save_to_h5py(mas_np, 'train_masks', 'train_masks.hdf5')
+    mas_np = np.array([cv2.imread(path, cv2.IMREAD_GRAYSCALE) for path in glob.glob(train_path + builder_config['result_masks_subfolder'] + '*.tiff')[:train_num]])
 
+    print("Saving training images and masks to h5py...\n")
+    save_to_h5py(img_np, mas_np, 'train.hdf5')
+
+    del img_np
     del mas_np
 
     print("Collecting test images...")
-    img_np = np.array([cv2.imread(path) for path in glob.glob(test_path + builder_config['result_images_subfolder'] + '*.tiff')])
-    print("Saving test images to h5py...\n")
-    save_to_h5py(img_np, 'test_images', 'test_images.hdf5')
-
-    del img_np
+    img_np = np.array([cv2.imread(path) for path in glob.glob(test_path + builder_config['result_images_subfolder'] + '*.tiff')][:test_num])
+    print(img_np.shape)
 
     print("Collecting test masks...")
-    mas_np = np.array([cv2.imread(path, cv2.IMREAD_GRAYSCALE) for path in glob.glob(test_path + builder_config['result_masks_subfolder'] + '*.tiff')])
-    print("Saving test masks to h5py...\n")
-    save_to_h5py(mas_np, 'test_masks', 'test_masks.hdf5')
+    mas_np = np.array([cv2.imread(path, cv2.IMREAD_GRAYSCALE) for path in glob.glob(test_path + builder_config['result_masks_subfolder'] + '*.tiff')][:test_num])
 
+    print("Saving test images and masks to h5py...\n")
+    save_to_h5py(img_np, mas_np, 'test.hdf5')
+
+    del img_np
     del mas_np
