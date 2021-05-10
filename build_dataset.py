@@ -20,9 +20,13 @@ def crop_save(images_path, masks_path, result_images_path, result_masks_path, im
     Функція поділяє зображення на частини, фільтрує їх та зберігає фрагменти фото і масок на диску.
 
     Параметри:
-    
+    images_path -- шлях до підкаталогу зі знімками
+    masks_path -- шлях до підкаталогу з масками
+    result_images_path -- шлях для збереження знімків результату
+    result_masks_path -- шлях для збереження масок результату
+    img_size -- розмір фрагментів
     """
-    skipped_num = 0
+    dropped_num = 0
     saved_num = 0
 
     print(images_path)
@@ -53,18 +57,29 @@ def crop_save(images_path, masks_path, result_images_path, result_masks_path, im
                     black_image_num = np.sum(cropped_image == 0)    
 
                     if white_mask_num/black_mask_num < 0.01 or black_image_num/cropped_image.size > 0.1:
-                        skipped_num += 1
+                        dropped_num += 1
                         continue
                     saved_num += 1
                     cv2.imwrite(result_images_path + str(counter) + '_' + image_filename, cropped_image)
                     cv2.imwrite(result_masks_path + str(counter) + '_' + image_filename, cropped_mask)
                 
     print("Час: {}с.".format(round((time.time()-start_time), 2)))
-    print("Пропущено зображень: ", skipped_num)
+    print("Пропущено зображень: ", dropped_num)
     print("Збережено зображень: ", saved_num)
     return saved_num
 
 def crop(image, mask, r1, r2, c1, c2):
+    """
+    Функція, що обрізає зображення та додає чорну рамку, якщо потрібно
+    
+    Параметри:
+    image -- знімок
+    maks -- маска
+    r1 -- ліва границя
+    r2 -- права границя
+    c1 -- верхня границя
+    c2 -- нижня границя
+    """
     result_image = np.zeros((img_size , img_size, 3), np.uint8)
     result_mask = np.zeros((img_size , img_size), np.uint8)
 
@@ -77,6 +92,14 @@ def crop(image, mask, r1, r2, c1, c2):
     return(result_image, result_mask)
 
 def save_to_h5py(img_data, mask_data, save_path):
+    """
+    Функція, що зберігає масив зображень та масив масок у hdf5 архів
+
+    Параметри:
+    img_data -- масив знімків
+    mask_data -- масив масок
+    save_path -- шлях для збереження результату
+    """
     with h5py.File(save_path, 'w') as f:
         f.create_dataset('images', data=img_data, compression="gzip", compression_opts=4)
         f.create_dataset('masks', data=mask_data, compression="gzip", compression_opts=4)
@@ -103,27 +126,27 @@ if __name__ == "__main__":
     test_num = int(test_files_percent * save_num)
     train_num = save_num - test_num
 
-    print("Collecting train images...")
+    print("Збираємо знімки для тренування..")
     img_np = np.array([cv2.imread(path) for path in glob.glob(result_images_path + '*.tiff')[:train_num]])
     print(img_np.shape)
 
-    print("Collecting train masks...")
+    print("Збираємо маски для тренування...")
     mas_np = np.array([cv2.imread(path, cv2.IMREAD_GRAYSCALE) for path in glob.glob(result_masks_path + '*.tiff')[:train_num]])
 
-    print("Saving training images and masks to h5py...\n")
+    print("Зберігаємо знімки та маски в hdf5...\n")
     save_to_h5py(img_np, mas_np, 'train.hdf5')
 
     del img_np
     del mas_np
 
-    print("Collecting test images...")
+    print("Збираємо знімки для тестування...")
     img_np = np.array([cv2.imread(path) for path in glob.glob(result_images_path + '*.tiff')][train_num:save_num])
     print(img_np.shape)
 
-    print("Collecting test masks...")
+    print("Збираємо маски для тестування...")
     mas_np = np.array([cv2.imread(path, cv2.IMREAD_GRAYSCALE) for path in glob.glob(result_masks_path + '*.tiff')][train_num:save_num])
 
-    print("Saving test images and masks to h5py...\n")
+    print("Зберігаємо знімки та маски в h5py...\n")
     save_to_h5py(img_np, mas_np, 'test.hdf5')
 
     del img_np
