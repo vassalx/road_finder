@@ -16,14 +16,19 @@ def get_filenames(files_path):
     return [os.path.basename(x) for x in glob.glob(files_path)]
 
 def crop_save(images_path, masks_path, result_images_path, result_masks_path, img_size):
-    print("Dataset Build Started!")
+    """
+    Функція поділяє зображення на частини, фільтрує їх та зберігає фрагменти фото і масок на диску.
+
+    Параметри:
     
+    """
     skipped_num = 0
+    saved_num = 0
 
     print(images_path)
     
     image_files = get_filenames(images_path +"*.tiff")
-    print('Number of files: {}'.format(len(image_files)))
+    print('Кількість файлів: {}'.format(len(image_files)))
     
     start_time = time.time()
 
@@ -50,12 +55,14 @@ def crop_save(images_path, masks_path, result_images_path, result_masks_path, im
                     if white_mask_num/black_mask_num < 0.01 or black_image_num/cropped_image.size > 0.1:
                         skipped_num += 1
                         continue
-
+                    saved_num += 1
                     cv2.imwrite(result_images_path + str(counter) + '_' + image_filename, cropped_image)
                     cv2.imwrite(result_masks_path + str(counter) + '_' + image_filename, cropped_mask)
                 
-    print("Time: {}s.".format(round((time.time()-start_time), 2)))
-    print("\nNumber of skipped images: {}".format(skipped_num))
+    print("Час: {}с.".format(round((time.time()-start_time), 2)))
+    print("Пропущено зображень: ", skipped_num)
+    print("Збережено зображень: ", saved_num)
+    return saved_num
 
 def crop(image, mask, r1, r2, c1, c2):
     result_image = np.zeros((img_size , img_size, 3), np.uint8)
@@ -91,7 +98,7 @@ if __name__ == "__main__":
     if not os.path.exists(result_masks_path):
         os.mkdir(result_masks_path)
 
-    crop_save(images_path, masks_path, result_images_path, result_masks_path, img_size)
+    save_num = crop_save(images_path, masks_path, result_images_path, result_masks_path, img_size)
 
     test_num = int(test_files_percent * save_num)
     train_num = save_num - test_num
