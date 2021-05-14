@@ -58,10 +58,12 @@ def crop_save(images_path, masks_path, result_images_path, result_masks_path, im
 
                     if white_mask_num/black_mask_num < 0.01 or black_image_num/cropped_image.size > 0.1:
                         dropped_num += 1
-                        continue
-                    saved_num += 1
-                    cv2.imwrite(result_images_path + str(counter) + '_' + image_filename, cropped_image)
-                    cv2.imwrite(result_masks_path + str(counter) + '_' + image_filename, cropped_mask)
+                    else:
+                        saved_num += 1
+                        cv2.imwrite(result_images_path + str(counter) + '_' + image_filename, cropped_image)
+                        cv2.imwrite(result_masks_path + str(counter) + '_' + image_filename, cropped_mask)
+                else:
+                    dropped_num += 1
                 
     print("Час: {}с.".format(round((time.time()-start_time), 2)))
     print("Пропущено зображень: ", dropped_num)
@@ -121,7 +123,7 @@ if __name__ == "__main__":
     if not os.path.exists(result_masks_path):
         os.mkdir(result_masks_path)
 
-    save_num = crop_save(images_path, masks_path, result_images_path, result_masks_path, img_size)
+    #crop_save(images_path, masks_path, result_images_path, result_masks_path, img_size)
 
     test_num = int(test_files_percent * save_num)
     train_num = save_num - test_num
